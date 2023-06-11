@@ -2,8 +2,23 @@
 use rumqttc::{self, AsyncClient, MqttOptions, QoS, Transport};
 #[cfg(feature = "websocket")]
 use std::{error::Error, time::Duration};
+use std::sync::Arc;
+use std::time::SystemTime;
+use rustls::client::{ServerCertVerified, ServerCertVerifier};
+use rustls::{Certificate, ClientConfig, ServerName};
 #[cfg(feature = "websocket")]
 use tokio::{task, time};
+use rumqttc::TlsConfiguration;
+
+struct CertVerifier {
+
+}
+
+impl ServerCertVerifier for CertVerifier {
+    fn verify_server_cert(&self, end_entity: &Certificate, intermediates: &[Certificate], server_name: &ServerName, scts: &mut dyn Iterator<Item=&[u8]>, ocsp_response: &[u8], now: SystemTime) -> Result<ServerCertVerified, rustls::Error> {
+        Ok(ServerCertVerified::assertion())
+    }
+}
 
 #[cfg(feature = "websocket")]
 #[tokio::main(worker_threads = 1)]
@@ -12,11 +27,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // port parameter is ignored when scheme is websocket
     let mut mqttoptions = MqttOptions::new(
-        "clientId-aSziq39Bp3",
-        "ws://broker.mqttdashboard.com:8000/mqtt",
-        8000,
+        "clientId-aSziq39Bpaa3",
+        "wss://server",
+        443,
     );
-    mqttoptions.set_transport(Transport::Ws);
+    mqttoptions.set_credentials("admin", "<pwd>");
+    let tls_config = ClientConfig::builder()
+        .with_safe_default_cipher_suites()
+        .with_safe_default_kx_groups()
+        .with_safe_default_protocol_versions()
+        .unwrap()
+        .with_custom_certificate_verifier(Arc::new(CertVerifier{}))
+        .with_no_client_auth();
+
+    mqttoptions.set_transport(Transport::Wss(TlsConfiguration::Rustls(Arc::new(tls_config))));
     mqttoptions.set_keep_alive(Duration::from_secs(60));
 
     let (client, mut eventloop) = AsyncClient::new(mqttoptions, 10);

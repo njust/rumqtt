@@ -350,6 +350,7 @@ async fn network_connect(
 
             let connector = tls::rustls_connector(&tls_config).await?;
 
+            // let (socket, _) = client_async_tls_with_connector_and_config(request, tcp, Some(connector), None).await?;
             let (socket, _) = connect_async_with_tls_connector(request, Some(connector)).await?;
 
             Network::new(WsStream::new(socket), options.max_incoming_packet_size)
